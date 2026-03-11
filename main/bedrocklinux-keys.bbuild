@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="bedrocklinux-keys"
+pkgver="0.8.0"
+pkgdesc="Bedrock Linux bpt package public keys"
+homepage="https://bedrocklinux.org/"
+license="MIT"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	noarch
+"
+makebins="
+	cat
+	chmod
+	mkdir
+	sh
+"
+makedepends=""
+source=""
+sha256sums=""
+
+build() {
+	mkdir -p "${pkgdir}/etc/bpt/keys"
+	cat <<EOF > "${pkgdir}/etc/bpt/keys/bedrock.pub"
+untrusted comment: Bedrock Linux bpt repository public key
+RWSWg+V4uzz1zQnoxOasWP88JSDHYVocplJDmovcWAtFiSjrm8R+vavz
+EOF
+	chmod 644 "${pkgdir}/etc/bpt/keys/bedrock.pub"
+}
+
+upstream_pkgver() {
+	# No upstream source which could become outdated
+	echo "${pkgver}"
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zVOnhgFbgrAzeDRhr89B1Yq/tNE5JLpsbDp8DsGzsgf/40UrFJjkrvstBqkI9x2UYmFjlPmjjdqVHhOH8T8JkQE

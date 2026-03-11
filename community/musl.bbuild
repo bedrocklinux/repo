@@ -1,0 +1,74 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="musl"
+pkgver="1.2.5"
+pkgdesc="a C standard library implementation for Linux"
+homepage="https://musl.libc.org/"
+license="MIT"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	gunzip
+	gzip
+"
+makedepends=""
+source="https://musl.libc.org/releases/musl-${pkgver}.tar.gz"
+sha256sums="a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4"
+
+build() {
+	cat "${pkgname}-${pkgver}.tar.gz" | gunzip | tar xf -
+	cd "${pkgname}-${pkgver}"
+
+	./configure \
+		--disabled-shared \
+		--enable-static \
+		--enable-gcc-wrapper \
+		--enable-warnings \
+		--prefix="/usr/${arch}" \
+		--exec-prefix="/usr/${arch}" \
+		--includedir="/usr/${arch}/include" \
+		--libdir="/usr/${arch}/lib" \
+		--host="${CHOST}" \
+		CC="${CC}" \
+		CFLAGS="${CFLAGS}" \
+		CROSS_COMPILE="${CROSS_COMPILE}"
+
+	make \
+		CC="${CC}" \
+		CFLAGS="${CFLAGS}" \
+		CROSS_COMPILE="${CROSS_COMPILE}" \
+		DESTDIR="${pkgdir}" \
+		HOST="${CHOST}" \
+		install
+}
+
+upstream_pkgver() {
+	# Expecting URL to contain a line such as:
+	# ```
+	# <li>Latest release: <a href="releases/musl-1.2.5.tar.gz">musl-1.2.5.tar.gz</a>
+	# ```
+	curl "${homepage}" 2>/dev/null | awk -F'[<>]' '/Latest release:/{gsub(/musl-|[.]tar[.]gz/,""); print$5}'
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zbsCPYRCH/mc811mzjpU3ogI3eQtmUYMUKHux8l5bvtnQbqf7DvT+0mmFFuxSlp+Lt0OTqbPOtdiBpyXEYRYQAA

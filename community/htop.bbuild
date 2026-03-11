@@ -1,0 +1,218 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="htop"
+upkgver="3.4.1"
+pkgver="${upkgver}-brl1"
+pkgdesc="interactive process viewer patched with Bedrock Linux stratum support"
+homepage="https://github.com/bedrocklinux/htop"
+license="GPL-2.0-or-later"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	egrep
+	patch
+	unxz
+"
+makedepends="
+	linux-headers>=6.6.0
+	libnl>=3.11.0
+	musl>=1.2.5
+	ncurses>=6.4.0
+"
+source="https://github.com/htop-dev/htop/releases/download/${upkgver}/htop-${upkgver}.tar.xz"
+sha256sums="904f7d4580fc11cffc7e0f06895a4789e0c1c054435752c151e812fead9f6220"
+
+build() {
+	cat "${pkgname}-${upkgver}.tar.xz" | unxz | tar xf -
+	cd "${pkgname}-${upkgver}"
+	make_patch | patch -p1
+
+	export CPPFLAGS="${CPPFLAGS} -DNCURSES_ENABLE_STDBOOL_H=1"
+	export CC="$(bpt_portable_musl_gcc)"
+	./configure CC="${CC}" \
+		--host="${CHOST}" \
+		--prefix="/usr/"
+	make CFLAGS="${CFLAGS} -static" CC="${CC}"
+	make install DESTDIR="${pkgdir}"
+}
+
+upstream_pkgver() {
+	# If upstream `htop` updates, our fork needs to update too
+	bpt_github_latest_release_tag "https://github.com/htop-dev/htop" | sed 's/$/-brl1/'
+}
+
+make_patch() {
+	cat <<'EOF'
+diff -urN htop-3.4.1-orig/linux/LinuxProcess.c htop-3.4.1-work/linux/LinuxProcess.c
+--- htop-3.4.1-orig/linux/LinuxProcess.c	2025-04-10 22:02:33.000000000 -0400
++++ htop-3.4.1-work/linux/LinuxProcess.c	2026-03-09 17:25:32.370706319 -0400
+@@ -89,6 +89,7 @@
+    [CGROUP] = { .name = "CGROUP", .title = "CGROUP (raw)", .description = "Which cgroup the process is in", .flags = PROCESS_FLAG_LINUX_CGROUP, .autoWidth = true, },
+    [CCGROUP] = { .name = "CCGROUP", .title = "CGROUP (compressed)", .description = "Which cgroup the process is in (condensed to essentials)", .flags = PROCESS_FLAG_LINUX_CGROUP, .autoWidth = true, },
+    [CONTAINER] = { .name = "CONTAINER", .title = "CONTAINER", .description = "Name of the container the process is in (guessed by heuristics)", .flags = PROCESS_FLAG_LINUX_CGROUP, .autoWidth = true, },
++   [STRATUM] = { .name = "STRATUM", .title = "STRATUM", .description = "Bedrock Linux stratum (or '?' if insufficient permissions to determine)", .flags = PROCESS_FLAG_LINUX_STRATUM, .autoWidth = true, },
+    [OOM] = { .name = "OOM", .title = " OOM ", .description = "OOM (Out-of-Memory) killer score", .flags = PROCESS_FLAG_LINUX_OOM, .defaultSortDesc = true, },
+    [IO_PRIORITY] = { .name = "IO_PRIORITY", .title = "IO ", .description = "I/O priority", .flags = PROCESS_FLAG_LINUX_IOPRIO, },
+ #ifdef HAVE_DELAYACCT
+@@ -127,6 +128,7 @@
+    free(this->container_short);
+    free(this->cgroup_short);
+    free(this->cgroup);
++   free(this->stratum);
+ #ifdef HAVE_OPENVZ
+    free(this->ctid);
+ #endif
+@@ -296,6 +298,10 @@
+       xSnprintf(buffer, n, "%-*.*s ", Row_fieldWidths[CONTAINER], Row_fieldWidths[CONTAINER], lp->container_short ? lp->container_short : "N/A");
+       RichString_appendWide(str, attr, buffer);
+       return;
++   case STRATUM:
++      xSnprintf(buffer, n, "%-*.*s ", Row_fieldWidths[STRATUM], Row_fieldWidths[STRATUM], lp->stratum ? lp->stratum : "?");
++      RichString_appendWide(str, attr, buffer);
++      return;
+    case OOM: xSnprintf(buffer, n, "%4u ", lp->oom); break;
+    case IO_PRIORITY: {
+       int klass = IOPriority_class(lp->ioPriority);
+@@ -435,6 +441,8 @@
+       return SPACESHIP_NULLSTR(p1->cgroup_short, p2->cgroup_short);
+    case CONTAINER:
+       return SPACESHIP_NULLSTR(p1->container_short, p2->container_short);
++   case STRATUM:
++      return SPACESHIP_NULLSTR(p1->stratum, p2->stratum);
+    case OOM:
+       return SPACESHIP_NUMBER(p1->oom, p2->oom);
+    #ifdef HAVE_DELAYACCT
+diff -urN htop-3.4.1-orig/linux/LinuxProcess.h htop-3.4.1-work/linux/LinuxProcess.h
+--- htop-3.4.1-orig/linux/LinuxProcess.h	2025-04-10 22:02:33.000000000 -0400
++++ htop-3.4.1-work/linux/LinuxProcess.h	2026-03-09 17:25:18.152707429 -0400
+@@ -31,6 +31,7 @@
+ #define PROCESS_FLAG_LINUX_AUTOGROUP 0x00080000
+ #define PROCESS_FLAG_LINUX_GPU       0x00100000
+ #define PROCESS_FLAG_LINUX_CONTAINER 0x00200000
++#define PROCESS_FLAG_LINUX_STRATUM   0x00400000
+ 
+ typedef struct LinuxProcess_ {
+    Process super;
+@@ -93,6 +94,7 @@
+    char* cgroup;
+    char* cgroup_short;
+    char* container_short;
++   char* stratum;
+    unsigned int oom;
+    #ifdef HAVE_DELAYACCT
+    unsigned long long int delay_read_time;
+diff -urN htop-3.4.1-orig/linux/LinuxProcessTable.c htop-3.4.1-work/linux/LinuxProcessTable.c
+--- htop-3.4.1-orig/linux/LinuxProcessTable.c	2025-04-10 22:02:33.000000000 -0400
++++ htop-3.4.1-work/linux/LinuxProcessTable.c	2026-03-09 17:25:48.247705080 -0400
+@@ -20,10 +20,12 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <sys/types.h>
+ #include <syscall.h>
+ #include <unistd.h>
+ #include <linux/capability.h> // raw syscall, no libcap  // IWYU pragma: keep // IWYU pragma: no_include <sys/capability.h>
+ #include <sys/stat.h>
++#include <sys/xattr.h>
+ 
+ #include "Compat.h"
+ #include "Hashtable.h"
+@@ -1094,6 +1096,40 @@
+ }
+ 
+ /*
++ * Read /proc/<pid>/root xattrs for Bedrock Linux stratum (thread-specific data)
++ */
++static void LinuxProcessTable_readStratum(LinuxProcess* process, openat_arg_t procFd, const LinuxProcess* mainTask) {
++   if (mainTask) {
++      if (mainTask->stratum) {
++         Row_updateFieldWidth(STRATUM, strlen(mainTask->stratum));
++         free_and_xStrdup(&process->stratum, mainTask->stratum);
++      } else {
++         free_and_xStrdup(&process->stratum, "?");
++      }
++      return;
++   }
++
++   int fd = Compat_openat(procFd, "root", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
++   if (fd < 0) {
++      free_and_xStrdup(&process->stratum, "?");
++      return;
++   }
++
++   char buf[MAX_NAME + 1];
++   ssize_t readCount = fgetxattr(fd, "user.bedrock.stratum", &buf, sizeof(buf) - 1);
++   close(fd);
++
++   if (readCount < 0) {
++      free_and_xStrdup(&process->stratum, "?");
++      return;
++   }
++
++   buf[readCount] = '\0';
++   Row_updateFieldWidth(STRATUM, strlen(buf));
++   free_and_xStrdup(&process->stratum, buf);
++}
++
++/*
+  * Read /proc/<pid>/oom_score (process-shared data)
+  */
+ static void LinuxProcessTable_readOomData(LinuxProcess* process, openat_arg_t procFd, const LinuxProcess* mainTask) {
+@@ -1768,6 +1804,9 @@
+       if (ss->flags & PROCESS_FLAG_LINUX_CGROUP)
+          LinuxProcessTable_readCGroupFile(lp, procFd);
+ 
++      if (ss->flags & PROCESS_FLAG_LINUX_STRATUM)
++         LinuxProcessTable_readStratum(lp, procFd, mainTask);
++
+       if ((ss->flags & PROCESS_FLAG_LINUX_SMAPS) && !Process_isKernelThread(proc)) {
+          if (!mainTask) {
+             // Read smaps file of each process only every second pass to improve performance
+diff -urN htop-3.4.1-orig/linux/Platform.c htop-3.4.1-work/linux/Platform.c
+--- htop-3.4.1-orig/linux/Platform.c	2025-04-10 22:02:33.000000000 -0400
++++ htop-3.4.1-work/linux/Platform.c	2026-03-09 17:25:36.950705962 -0400
+@@ -91,7 +91,7 @@
+ const ScreenDefaults Platform_defaultScreens[] = {
+    {
+       .name = "Main",
+-      .columns = "PID USER PRIORITY NICE M_VIRT M_RESIDENT M_SHARE STATE PERCENT_CPU PERCENT_MEM TIME Command",
++      .columns = "PID USER STRATUM PRIORITY NICE M_VIRT M_RESIDENT M_SHARE STATE PERCENT_CPU PERCENT_MEM TIME Command",
+       .sortKey = "PERCENT_CPU",
+    },
+    {
+diff -urN htop-3.4.1-orig/linux/ProcessField.h htop-3.4.1-work/linux/ProcessField.h
+--- htop-3.4.1-orig/linux/ProcessField.h	2025-04-10 22:02:33.000000000 -0400
++++ htop-3.4.1-work/linux/ProcessField.h	2026-03-09 17:25:14.535707711 -0400
+@@ -51,6 +51,7 @@
+    GPU_TIME = 132,               \
+    GPU_PERCENT = 133,            \
+    ISCONTAINER = 134,            \
++   STRATUM = 135,                \
+    // End of list
+ 
+ 
+EOF
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zZFu6a64GgneLR1ZOX96R40ABEsX2iDGkTuc3j6qJllRyQMyT6+EASp1BEaHb5ArpYXEmDd6t887fwrN100GWAk

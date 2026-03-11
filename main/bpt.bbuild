@@ -1,0 +1,82 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="bpt"
+pkgver="0.1.0"
+pkgdesc="Bedrock Package Tool; Bedrock Linux's package manager"
+homepage="https://bedrocklinux.org/bpt"
+license="GPL-2.0"
+depends=""
+backup="
+	etc/bpt/bpt.conf
+	etc/bpt/make.conf
+	etc/bpt/make.common
+"
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	cargo
+	gunzip
+"
+makedepends=""
+source="https://github.com/bedrocklinux/bpt/archive/refs/tags/v0.1.0.tar.gz"
+sha256sums="76001bd8bd39a9778cd526807b608b54b660316c9c353b95e0a5d880390bdde8"
+
+build() {
+	cat "v${pkgver}.tar.gz" | gunzip | tar xf -
+	cd "${pkgname}-${pkgver}"
+
+	cargo_flags="--profile release --target ${CARGO_BUILD_TARGET}"
+	RUSTFLAGS="${RUSTFLAGS} -C target-feature=+crt-static"
+	RUSTFLAGS="${RUSTFLAGS} -C linker=${LD}"
+	export RUSTFLAGS
+
+	cargo build ${cargo_flags}
+
+	mkdir -p "${pkgdir}/usr/bin"
+	cp "target/${CARGO_BUILD_TARGET}/release/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
+
+	mkdir -p "${pkgdir}/etc/bpt"
+	cp "assets/default-configs/bpt.conf" "${pkgdir}/etc/bpt/"
+	cp "assets/default-configs/make.conf" "${pkgdir}/etc/bpt/"
+	cp "assets/default-configs/make.common" "${pkgdir}/etc/bpt/"
+
+	mkdir -p "${pkgdir}/usr/share/bash-completion/completions"
+	cp "contrib/completion/bpt.bash" \
+		"${pkgdir}/usr/share/bash-completion/completions/bpt"
+	mkdir -p "${pkgdir}/usr/share/zsh/site-functions"
+	cp "contrib/completion/_bpt" \
+		"${pkgdir}/usr/share/zsh/site-functions/_bpt"
+	mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d"
+	cp "contrib/completion/bpt.fish" \
+		"${pkgdir}/usr/share/fish/vendor_completions.d/bpt.fish"
+
+	mkdir -p "${pkgdir}/usr/share/man/man1"
+	cp "doc/man/bpt.1" "${pkgdir}/usr/share/man/man1/bpt.1"
+	mkdir -p "${pkgdir}/usr/share/man/man5"
+	cp "doc/man/bpt.conf.5" "${pkgdir}/usr/share/man/man5/bpt.conf.5"
+}
+
+upstream_pkgver() {
+	bpt_github_latest_release_tag "https://github.com/bedrocklinux/bpt" | sed 's/^v//'
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zRcQc7PWTczcyrkV/9raM79+6CjTUTIo0On6L5jGZUfPNysgYjtMgNzHQQjoyzrfpmONkdYfu6CWd3p9ODvcmQ4

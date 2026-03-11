@@ -1,0 +1,96 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="zsh"
+upkgver="5.9"
+pkgver="${upkgver}.0"
+pkgdesc="a feature-rich Unix shell"
+homepage="https://www.zsh.org/"
+license="MIT-like"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	egrep
+	unxz
+"
+makedepends="
+	musl>=1.2.5
+	ncurses>=6.6.0
+"
+source="https://www.zsh.org/pub/${pkgname}-${upkgver}.tar.xz"
+sha256sums="SKIP"
+
+build() {
+	cat "${pkgname}-${upkgver}.tar.xz" | unxz | tar xf -
+	cd "${pkgname}-${upkgver}"
+
+	# zsh 5.9's generated configure script misprobes ncurses terminfo globals
+	# against newer headers unless these tests cast away constness explicitly.
+	sed -i \
+		-e 's/char \*\*test = boolcodes;/char **test = (char **)boolcodes;/' \
+		-e 's/char \*\*test = numcodes;/char **test = (char **)numcodes;/' \
+		-e 's/char \*\*test = strcodes;/char **test = (char **)strcodes;/' \
+		-e 's/char \*\*test = boolnames;/char **test = (char **)boolnames;/' \
+		-e 's/char \*\*test = numnames;/char **test = (char **)numnames;/' \
+		-e 's/char \*\*test = strnames;/char **test = (char **)strnames;/' \
+		configure
+
+	# zsh's configure checks need an explicit musl dynamic linker.
+	export CC="$(bpt_portable_musl_gcc)"
+	export LDFLAGS="${LDFLAGS} -Wl,--dynamic-linker=/lib/ld-musl-${arch}.so.1"
+	export LIBS="-lncursesw -lm"
+
+	# Keep optional gdbm, pcre, and libcap integrations disabled to avoid extra deps.
+	./configure \
+		CC="${CC}" \
+		--host="${CHOST}" \
+		--prefix="/usr" \
+		--bindir="/usr/bin" \
+		--libdir="/usr/${arch}/lib" \
+		--mandir="/usr/share/man" \
+		--disable-dynamic \
+		--enable-multibyte
+
+	make \
+		CC="${CC}" \
+		CFLAGS="${CFLAGS}" \
+		CPPFLAGS="${CPPFLAGS}" \
+		LDFLAGS="${LDFLAGS}" \
+		LIBS="${LIBS}"
+
+	make \
+		DESTDIR="${pkgdir}" \
+		install.bin \
+		install.fns \
+		install.man
+}
+
+upstream_pkgver() {
+	curl "https://www.zsh.org/pub/" 2>/dev/null \
+		| grep -o 'zsh-[0-9][0-9.]*[.]tar[.]xz' \
+		| sed 's/^zsh-//; s/[.]tar[.]xz$//; /^[0-9][0-9]*[.][0-9][0-9]*$/ s/$/.0/' \
+		| sort -t . -k1,1n -k2,2n -k3,3n -k4,4n \
+		| tail -n1
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zb7f48GELgqd1rZ9IGA/WlzjzT2tW3xHEQfdsZGGUu+txQMDvoyzc0bmoDpIyGw8/O3Au1H1FV3+TFqN3LdRYgQ

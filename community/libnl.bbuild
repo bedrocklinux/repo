@@ -1,0 +1,93 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="libnl"
+pkgver="3.11.0"
+pkgdesc="Netlink protocol library suite"
+homepage="https://github.com/thom311/libnl"
+license="LGPL-2.1-or-later"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	dd
+	egrep
+	file
+	g++
+	mt
+	nm
+	objdump
+	pkg-config
+	strip
+"
+makedepends="
+	linux-headers>=6.19.6
+	musl>=1.2.5
+"
+source="https://github.com/thom311/libnl/releases/download/libnl3_11_0/libnl-${pkgver}.tar.gz"
+sha256sums="SKIP"
+
+build() {
+	cat "${pkgname}-${pkgver}.tar.gz" | gunzip | tar xf -
+	cd "${pkgname}-${pkgver}"
+
+	export CC="$(bpt_portable_musl_gcc)"
+	export YACC=:
+	export FLEX=:
+
+	./configure \
+		CC="${CC}" \
+		--host="${CHOST}" \
+		--prefix="/usr/${arch}" \
+		--disable-shared \
+		--enable-static \
+		--disable-cli
+
+	# Build only what htop needs to avoid route parser generator requirements.
+	make \
+		CC="${CC}" \
+		CFLAGS="${CFLAGS}" \
+		lib/libnl-3.la \
+		lib/libnl-genl-3.la
+
+	install -d \
+		"${pkgdir}/usr/${arch}/lib" \
+		"${pkgdir}/usr/${arch}/lib/pkgconfig" \
+		"${pkgdir}/usr/${arch}/include/libnl3"
+
+	./libtool --mode=install install -c lib/libnl-3.la "${pkgdir}/usr/${arch}/lib/libnl-3.la"
+	./libtool --mode=install install -c lib/libnl-genl-3.la "${pkgdir}/usr/${arch}/lib/libnl-genl-3.la"
+
+	cp libnl-3.0.pc libnl-genl-3.0.pc "${pkgdir}/usr/${arch}/lib/pkgconfig/"
+	cp -a include/netlink "${pkgdir}/usr/${arch}/include/libnl3/"
+
+	# Some consumers include <netlink/...> without adding -I.../include/libnl3.
+	# Provide a compatibility path in the default include root.
+	ln -s libnl3/netlink "${pkgdir}/usr/${arch}/include/netlink"
+}
+
+upstream_pkgver() {
+	bpt_github_latest_release_tag "https://github.com/thom311/libnl" \
+		| sed -E 's/^libnl([0-9]+)_([0-9]+)_([0-9]+)$/\1.\2.\3/'
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zS2jRrA06v7oe8JJtRqCo3s5W5IkpdMCJ2ikF7NqIsxpyuxlhHQS0rhepFfSYVYE0i24EQekDj7eTLGC1ukGKwY

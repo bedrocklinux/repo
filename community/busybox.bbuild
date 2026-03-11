@@ -1,0 +1,83 @@
+#!/bedrock/cross/bin/sh
+set -eu
+
+# Package metadata
+pkgname="busybox"
+pkgver="1.36.1"
+pkgdesc="multi-call binary providing a wide range of standard Unix utilities"
+homepage="https://busybox.net/"
+license="GPL-2.0-only"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	bzip2
+"
+makedepends="
+	linux-headers>=6.19.6
+	musl>=1.2.5
+"
+source="https://busybox.net/downloads/${pkgname}-${pkgver}.tar.bz2"
+sha256sums="b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314"
+
+set_bb_option() {
+	var="${1}"
+	val="${2}"
+	if grep -q "^${var}=" .config; then
+		sed "s,^${var}=.*,${var}=${val}," .config > .config-new
+		mv .config-new .config
+	elif grep -q "^# ${var} is not set" .config; then
+		sed "s,^# ${var} is not set,${var}=${val}," .config > .config-new
+		mv .config-new .config
+	else
+		echo "${var}=${val}" >> .config
+	fi
+}
+
+build() {
+	cat "${pkgname}-${pkgver}.tar.bz2" | bunzip2 | tar xf -
+	cd "${pkgname}-${pkgver}"
+
+	export CC="$(bpt_portable_musl_gcc)"
+
+	make defconfig
+	set_bb_option "CONFIG_STATIC" "y"
+	set_bb_option "CONFIG_FEATURE_INSTALLER" "y"
+	set_bb_option "CONFIG_INSTALL_APPLET_SYMLINKS" "y"
+	set_bb_option "CONFIG_BUSYBOX_EXEC_PATH" "\"/usr/bin/busybox\""
+	set_bb_option "CONFIG_TC" "n" # broken, disable
+
+	make \
+		CC="${CC}" \
+		CFLAGS="${CFLAGS}" \
+		LDFLAGS="${LDFLAGS}"
+
+	make CONFIG_PREFIX="${pkgdir}" install
+}
+
+upstream_pkgver() {
+	curl "https://busybox.net/" 2>/dev/null \
+		| grep -o 'BusyBox [0-9][0-9.]* (stable)' \
+		| head -n1 \
+		| awk '{print $2}'
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zaslQdAKbIPbsiZWYMVOn3Irwi+F9VaNTp7YwexG5NgmNMtrupvkvmyaRqQG4T3WsQ8MxSRLId1oRgkLWOtxRQM

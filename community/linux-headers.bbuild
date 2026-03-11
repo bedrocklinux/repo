@@ -1,0 +1,63 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="linux-headers"
+pkgver="6.19.6"
+pkgdesc="Linux kernel UAPI headers"
+homepage="https://kernel.org"
+license="GPL-2.0-only"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	rsync
+	unxz
+"
+makedepends=""
+
+source="https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${pkgver}.tar.xz"
+sha256sums="SKIP"
+
+build() {
+	cat "linux-${pkgver}.tar.xz" | unxz | tar xf -
+	cd "linux-${pkgver}"
+
+	case "${arch}" in
+		aarch64) karch="arm64" ;;
+		armv7l|armv7hl) karch="arm" ;;
+		i686|x86_64) karch="x86" ;;
+		mips|mips64|mips64el|mipsel) karch="mips" ;;
+		powerpc|powerpc64|powerpc64le) karch="powerpc" ;;
+		s390x) karch="s390" ;;
+		riscv64gc) karch="riscv" ;;
+		*) echo "Unsupported arch for linux-headers: ${arch}" >&2; exit 1 ;;
+	esac
+
+	make ARCH="${karch}" headers_install INSTALL_HDR_PATH="${pkgdir}/usr/${arch}"
+}
+
+upstream_pkgver() {
+	curl "https://www.kernel.org/releases.json" 2>/dev/null \
+		| jq -r '.latest_stable.version'
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zb5yvJvaBThjEozPaK24TWw71nkvkg32m4nvmr2BGO/fGU6JvboMrqkySaslTIGzFZuWA0anHKDw/GLm7PkpVgw

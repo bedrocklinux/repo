@@ -1,0 +1,88 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="ncurses"
+pkgver="6.6.0"
+pkgdesc="text-based user interface library"
+homepage="https://invisible-island.net/ncurses/"
+license="X11"
+depends=""
+backup=""
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	@core
+	egrep
+	gunzip
+	gzip
+"
+makedepends="
+	musl>=1.2.5
+"
+source="https://invisible-island.net/archives/ncurses/ncurses-${pkgver%%.0}.tar.gz"
+sha256sums="355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11"
+
+build() {
+	cat "${pkgname}-${pkgver%%.0}.tar.gz" | gunzip | tar xf -
+	cd "${pkgname}-${pkgver%%.0}"
+
+	export CC="$(bpt_portable_musl_gcc)"
+
+	# Build Bedrock packages against /bedrock/cross/terminfo so consumers such as
+	# htop look there by default and can reuse terminfo from other strata.
+	./configure CC="${CC}" \
+		--enable-widec \
+		--prefix="/usr/${arch}" \
+		--host="${CHOST}" \
+		--with-default-terminfo-dir="/bedrock/cross/terminfo/" \
+		--without-cxx \
+		--without-libtool \
+		--without-manpages \
+		--without-pkg-config \
+		--without-progs \
+		--without-shared
+	make \
+		CC="${CC}" \
+		CFLAGS="${CFLAGS}" \
+		CROSS_COMPILE="${CROSS_COMPILE}" \
+		DESTDIR="${pkgdir}" \
+		HOST="${CHOST}" \
+		install
+
+	# Package ncurses itself with the normal per-stratum terminfo layout. Bedrock's
+	# cross-strata /bedrock/cross/terminfo view will still surface this copy when
+	# no other stratum provides terminfo, while consumers retain the Bedrock-aware
+	# compiled default search path from the configure flag above.
+	if [ -d "${pkgdir}/bedrock/cross/terminfo" ]; then
+		mkdir -p "${pkgdir}/usr/share"
+		mv "${pkgdir}/bedrock/cross/terminfo" "${pkgdir}/usr/share/terminfo"
+		rmdir -p --ignore-fail-on-non-empty "${pkgdir}/bedrock/cross" 2>/dev/null || true
+	fi
+}
+
+upstream_pkgver() {
+	curl "${source%/*}/" 2>/dev/null \
+		| grep -o 'ncurses-[0-9][0-9.]*[.]tar[.]gz' \
+		| sed 's/^ncurses-//; s/[.]tar[.]gz$//; /^[0-9][0-9]*[.][0-9][0-9]*$/ s/$/.0/' \
+		| sort -t . -k1,1n -k2,2n -k3,3n -k4,4n \
+		| tail -n1
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zYAT4YGsRFkgXsMp4+UYe/l/oAiuzk9+WrPyBFdsRAhTnZcY3NCSswyvmlz9P0uNfuDNjs4dhF2ucGQMekStsAE

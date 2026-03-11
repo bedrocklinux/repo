@@ -1,0 +1,101 @@
+#!/bin/sh
+set -eu
+
+# Package metadata
+pkgname="bedrocklinux-repo"
+pkgver="0.8.0"
+pkgdesc="Bedrock Linux repository configuration"
+homepage="https://bedrocklinux.org/"
+license="MIT"
+depends=""
+backup="etc/bpt/repos/bedrock"
+
+# Build time information
+makearch="
+	aarch64
+	armv7hl
+	armv7l
+	i686
+	mips
+	mips64
+	mips64el
+	mipsel
+	powerpc
+	powerpc64
+	powerpc64le
+	riscv64gc
+	s390x
+	x86_64
+"
+makebins="
+	cat
+	mkdir
+	sh
+"
+makedepends=""
+source=""
+sha256sums=""
+
+build() {
+	mkdir -p "${pkgdir}/etc/bpt/repos"
+	cat <<EOF > "${pkgdir}/etc/bpt/repos/bedrock"
+#
+# Bedrock Linux bpt repository configuration
+#
+# '<repo>/<arch>.pkgidx' lines provide access to pre-built packages for the
+# corresponding architecture.
+#
+# '<repo>/<arch>.fileidx' lines provide access to information mapping packages
+# to the files they provide for the corresponding architecture.
+#
+# '<repo>/bbuild.pkgidx' lines provide access to package build definitions used
+# to build packages from source.
+#
+# One advantage of building from source is access to non-portable optimizations
+# for the local machine.  If you try this, consider including 'native' in
+# \`/etc/bpt/bpt.conf\`'s 'default-archs' line.
+#
+
+#
+# Main repository
+#
+# Packages maintained by the core Bedrock Linux development team.
+#
+
+# Pre-built packages
+https://bedrocklinux.org/repo/0.8/main/noarch.pkgidx
+https://bedrocklinux.org/repo/0.8/main/${arch}.pkgidx
+
+# \`bpt provides\` information
+https://bedrocklinux.org/repo/0.8/main/noarch.fileidx
+https://bedrocklinux.org/repo/0.8/main/${arch}.fileidx
+
+# From-source packages
+# https://bedrocklinux.org/repo/0.8/main/bbuild.pkgidx
+
+#
+# Community repository
+#
+# Packages checked by the Bedrock Linux team but which lack an official
+# maintainer.  Updates may be slow or non-existent.
+#
+
+# Pre-built packages
+https://bedrocklinux.org/repo/0.8/community/noarch.pkgidx
+https://bedrocklinux.org/repo/0.8/community/${arch}.pkgidx
+
+# \`bpt provides\` information
+https://bedrocklinux.org/repo/0.8/community/noarch.fileidx
+https://bedrocklinux.org/repo/0.8/community/${arch}.fileidx
+
+# From-source packages
+# https://bedrocklinux.org/repo/0.8/community/bbuild.pkgidx
+EOF
+}
+
+upstream_pkgver() {
+	# No upstream source which could become outdated
+	echo "${pkgver}"
+}
+
+# bpt-sig-v1:RUSWg+V4uzz1zfwjq3pdhWuiJlEPUtZTcWW2P3Q1x+YGqZTZg3q6OYOKEgapbfri+6VGpr3uPYmtEBrC4779Dew2nUMxPepKQwY
