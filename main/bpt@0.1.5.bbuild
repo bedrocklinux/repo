@@ -3,7 +3,7 @@ set -eu
 
 # Package metadata
 pkgname="bpt"
-pkgver="0.1.4"
+pkgver="0.1.5"
 pkgdesc="Bedrock Package Tool; Bedrock Linux's package manager"
 homepage="https://bedrocklinux.org/bpt"
 license="GPL-2.0"
@@ -39,7 +39,7 @@ makebins="
 "
 makedepends=""
 source="https://github.com/bedrocklinux/bpt/archive/refs/tags/v${pkgver}.tar.gz"
-sha256sums="800944103ba75b3e69f18d8c873b3dc3b05cfe2d5cf9adec415cfb625753bf95"
+sha256sums="04c81592d0cba8b9e6f348c5fe71fae7c88b9bd5e92577d7d649a607f290affe"
 
 build() {
 	cat "v${pkgver}.tar.gz" | gunzip | tar xf -
@@ -82,4 +82,4 @@ upstream_pkgver() {
 	bpt_github_latest_release_tag "https://github.com/bedrocklinux/bpt" | sed 's/^v//'
 }
 
-# bpt-sig-v1:RUSWg+V4uzz1zRKOKUmhRPx7SLoeekC/YJXPAGjblXtx238Ikpac8uI9lWMOkWSAwIlA2VCMzeKIbWZuBL/chG9Xe1AMmukl6gk
+# bpt-sig-v1:RUSWg+V4uzz1zQFl5h47yjEqkKL89r6RKXWW45r47KRZ9+Dwoo7l7ZlRZDZ/v1hp5h4mLrKQBUqYusYbGg+/o40H8MBJB//UCQI
