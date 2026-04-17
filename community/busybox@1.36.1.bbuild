@@ -59,10 +59,11 @@ build() {
 	export CC="$(bpt_portable_musl_gcc)"
 
 	make defconfig
-	set_bb_option "CONFIG_STATIC" "y"
-	set_bb_option "CONFIG_FEATURE_INSTALLER" "y"
-	set_bb_option "CONFIG_INSTALL_APPLET_SYMLINKS" "y"
 	set_bb_option "CONFIG_BUSYBOX_EXEC_PATH" "\"/usr/bin/busybox\""
+	set_bb_option "CONFIG_FEATURE_INSTALLER" "y"
+	set_bb_option "CONFIG_FEATURE_VI_USE_SIGNALS" "n" # remove glibc dependency
+	set_bb_option "CONFIG_INSTALL_APPLET_SYMLINKS" "y"
+	set_bb_option "CONFIG_STATIC" "y"
 	set_bb_option "CONFIG_TC" "n" # broken, disable
 
 	make \
@@ -80,4 +81,4 @@ upstream_pkgver() {
 		| awk '{print $2}'
 }
 
-# bpt-sig-v1:RUSWg+V4uzz1zaslQdAKbIPbsiZWYMVOn3Irwi+F9VaNTp7YwexG5NgmNMtrupvkvmyaRqQG4T3WsQ8MxSRLId1oRgkLWOtxRQM
+# bpt-sig-v1:RUSWg+V4uzz1zY9HBLcyYSe5nEDeNgPvSx1GA8FyssydZFaJ7MMR4LQUK7um9gvFMYTy9YFdxvbrko6+XzlX6LdItLqQ4YM0Fgk
