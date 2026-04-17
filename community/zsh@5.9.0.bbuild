@@ -55,9 +55,8 @@ build() {
 		-e 's/char \*\*test = strnames;/char **test = (char **)strnames;/' \
 		configure
 
-	# zsh's configure checks need an explicit musl dynamic linker.
 	export CC="$(bpt_portable_musl_gcc)"
-	export LDFLAGS="${LDFLAGS} -Wl,--dynamic-linker=/lib/ld-musl-${arch}.so.1"
+	export LDFLAGS="${LDFLAGS} -static"
 	export LIBS="-lncursesw -lm"
 
 	# Keep optional gdbm, pcre, and libcap integrations disabled to avoid extra deps.
@@ -69,6 +68,7 @@ build() {
 		--libdir="/usr/${arch}/lib" \
 		--mandir="/usr/share/man" \
 		--disable-dynamic \
+		--enable-static \
 		--enable-multibyte
 
 	make \
@@ -93,4 +93,4 @@ upstream_pkgver() {
 		| tail -n1
 }
 
-# bpt-sig-v1:RUSWg+V4uzz1zb7f48GELgqd1rZ9IGA/WlzjzT2tW3xHEQfdsZGGUu+txQMDvoyzc0bmoDpIyGw8/O3Au1H1FV3+TFqN3LdRYgQ
+# bpt-sig-v1:RUSWg+V4uzz1zV9VbiA8BpBHr8gxwn7okn24/9tG6E3qJJC8ESIbmS7nsAuD3iuzhm/7mgi2wGZP8/MbTkExHK7DLzBx/XHpyQQ
